@@ -9,17 +9,33 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
-from pathlib import Path
 import os
-GDAL_LIBRARY_PATH = os.path.join(os.environ['CONDA_PREFIX'], 'Library', 'bin', 'gdal304.dll')
+from pathlib import Path
+
+# Chemins par défaut pour Windows
 if os.name == 'nt':
-    os.environ['PATH'] = r'C:\OSGeo4W\bin;' + os.environ['PATH']
-    os.environ['PROJ_LIB'] = r'C:\OSGeo4W\share\proj'
-    
-    # Spécifiez explicitement les chemins
-    GDAL_LIBRARY_PATH = r'C:\OSGeo4W\bin\gdal311.dll'
-    GEOS_LIBRARY_PATH = r'C:\OSGeo4W\bin\geos_c.dll'
+    # Option 1: Chemins Conda (prioritaire)
+    conda_gdal_path = r'C:\Users\ASUS\miniconda3\envs\gis_env\Library\bin\gdal304.dll'
+    conda_geos_path = r'C:\Users\ASUS\miniconda3\envs\gis_env\Library\bin\geos_c.dll'
+
+    # Option 2: Chemins OSGeo4W (fallback)
+    osgeo_gdal_path = r'C:\OSGeo4W\bin\gdal304.dll'
+    osgeo_geos_path = r'C:\OSGeo4W\bin\geos_c.dll'
+
+    # Configuration automatique
+    if Path(conda_gdal_path).exists():
+        GDAL_LIBRARY_PATH = conda_gdal_path
+        GEOS_LIBRARY_PATH = conda_geos_path
+        os.environ['PATH'] = f"{os.path.dirname(conda_gdal_path)};{os.environ['PATH']}"
+    elif Path(osgeo_gdal_path).exists():
+        GDAL_LIBRARY_PATH = osgeo_gdal_path
+        GEOS_LIBRARY_PATH = osgeo_geos_path
+        os.environ['PATH'] = f"C:\OSGeo4W\bin;{os.environ['PATH']}"
+        os.environ['PROJ_LIB'] = r'C:\OSGeo4W\share\proj'
+    else:
+        GDAL_LIBRARY_PATH = None
+        GEOS_LIBRARY_PATH = None
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -85,7 +101,7 @@ WSGI_APPLICATION = 'heatmap.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',  # Évitez spatialite avec Python 3.13
+        'ENGINE': 'django.db.backends.sqlite3',  # Utilisez SQLite standard
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }

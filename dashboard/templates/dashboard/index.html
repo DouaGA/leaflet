@@ -1,19 +1,107 @@
-{% extends 'partials/base.html' %}
+{% extends "partials/base.html" %}
+
+{% block title %}Tableau de Bord{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map { height: 500px; }
+    .pending-list { max-height: 300px; overflow-y: auto; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div id="map" style="height: 80vh; width: 100%;"></div>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Ajouter un nouveau pays</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        {{ form.as_p }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Enregistrer
+                    </button>
+                </form>
+            </div>
+        </div>
 
-<!-- Leaflet + Plugins -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">En attente de géocodage</h4>
+            </div>
+            <div class="card-body pending-list">
+                {% if pending_locations %}
+                    <ul class="list-group">
+                        {% for location in pending_locations %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ location.country }}
+                            <span class="badge badge-primary badge-pill">{{ location.population }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="alert alert-info">Aucune donnée en attente</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Carte des données</h4>
+            </div>
+            <div class="card-body">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
-    const map = L.map('map').setView([19, -12], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    $(document).ready(function() {
+        // Initialisation de la carte
+        var map = L.map('map').setView([20, 0], 2);
 
-    // Heatmap avec les données Django
-    const heatPoints = {{ points|safe }}.map(p => [p.latitude, p.longitude, p.population / 1000]);
-    L.heatLayer(heatPoints, { radius: 25, blur: 15 }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Ajout des marqueurs
+        {% for location in locations %}
+            {% if location.latitude and location.longitude %}
+            L.marker([{{ location.latitude }}, {{ location.longitude }}])
+                .addTo(map)
+                .bindPopup(`
+                    <b>{{ location.country }}</b><br>
+                    Population: {{ location.population|default:"N/A" }}
+                `);
+            {% endif %}
+        {% endfor %}
+
+        // Auto-refresh toutes les 30s
+        setTimeout(() => location.reload(), 30000);
+
+        // Géocodage automatique
+        $('#id_country').change(function() {
+            const country = $(this).val();
+            if(country) {
+                fetch(`/geocode/?country=${encodeURIComponent(country)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if(data.lat && data.lng) {
+                            $('#id_latitude').val(data.lat);
+                            $('#id_longitude').val(data.lng);
+                        }
+                    });
+            }
+        });
+    });
 </script>
 {% endblock %}

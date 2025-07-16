@@ -4,4 +4,8 @@ from .models import Data
 class DataForm(forms.ModelForm):
     class Meta:
         model = Data
-        fields = ['adresse']  # On ne montre que le champ adresse
+        fields = ['country', 'population']
+        widgets = {
+            'country': forms.TextInput(attrs={'class': 'form-control'}),
+            'population': forms.NumberInput(attrs={'class': 'form-control'})
+        }
