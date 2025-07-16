@@ -1,0 +1,19 @@
+{% extends 'partials/base.html' %}
+
+{% block content %}
+<div id="map" style="height: 80vh; width: 100%;"></div>
+
+<!-- Leaflet + Plugins -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script>
+    const map = L.map('map').setView([19, -12], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Heatmap avec les données Django
+    const heatPoints = {{ points|safe }}.map(p => [p.latitude, p.longitude, p.population / 1000]);
+    L.heatLayer(heatPoints, { radius: 25, blur: 15 }).addTo(map);
+</script>
+{% endblock %}
