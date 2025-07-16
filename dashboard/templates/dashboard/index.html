@@ -1,23 +1,55 @@
 {% extends "partials/base.html" %}
 
-{% block title %}Tableau de Bord{% endblock %}
+{% block title %}Tableau de Bord Cartographique{% endblock %}
 
 {% block extra_css %}
 <style>
     #map { height: 500px; }
     .pending-list { max-height: 300px; overflow-y: auto; }
+    #search-container { margin-bottom: 15px; }
+    .coordinates-info { margin-top: 15px; }
+    .custom-marker .marker-pin {
+        width: 30px;
+        height: 30px;
+        border-radius: 50% 50% 50% 0;
+        position: absolute;
+        transform: rotate(-45deg);
+        left: 50%;
+        top: 50%;
+        margin: -15px 0 0 -15px;
+    }
+    .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+    }
+    /* Styles pour les outils de dessin */
+    .leaflet-draw-toolbar a {
+        background-image: url('https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/images/spritesheet.png') !important;
+    }
+    .leaflet-draw-toolbar .leaflet-draw-draw-polygon {
+        background-position: -2px -2px !important;
+    }
+    .leaflet-draw-toolbar .leaflet-draw-edit-edit {
+        background-position: -62px -2px !important;
+    }
+    .leaflet-draw-toolbar .leaflet-draw-edit-remove {
+        background-position: -122px -2px !important;
+    }
+    .polygon-actions {
+        margin-top: 10px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-6">
+        <!-- Formulaire d'ajout de pays -->
         <div class="card mb-4">
             <div class="card-header">
                 <h4 class="mb-0">Ajouter un nouveau pays</h4>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" id="country-form">
                     {% csrf_token %}
                     <div class="form-group">
                         {{ form.as_p }}
@@ -29,9 +61,11 @@
             </div>
         </div>
 
+        <!-- Liste en attente de géocodage -->
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="mb-0">En attente de géocodage</h4>
+                <span class="badge badge-warning">{{ pending_locations|length }}</span>
             </div>
             <div class="card-body pending-list">
                 {% if pending_locations %}
@@ -39,24 +73,46 @@
                         {% for location in pending_locations %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             {{ location.country }}
-                            <span class="badge badge-primary badge-pill">{{ location.population }}</span>
+                            <button class="btn btn-sm btn-outline-primary geocode-btn" 
+                                    data-country="{{ location.country }}"
+                                    data-id="{{ location.id }}">
+                                <i class="fas fa-map-marker-alt"></i> Géocoder
+                            </button>
                         </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <div class="alert alert-info">Aucune donnée en attente</div>
+                    <div class="alert alert-success">Tous les pays sont géocodés!</div>
                 {% endif %}
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
+        <!-- Carte avec outils de dessin -->
         <div class="card">
-            <div class="card-header">
-                <h4 class="mb-0">Carte des données</h4>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Carte Interactive</h4>
+                <small class="text-muted">Dessinez des zones avec <i class="fas fa-draw-polygon"></i></small>
             </div>
             <div class="card-body">
+                <div id="search-container" class="input-group">
+                    <input type="text" id="country-search" class="form-control" placeholder="Rechercher un pays...">
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" id="search-btn">
+                            <i class="fas fa-search"></i> Chercher
+                        </button>
+                    </div>
+                </div>
                 <div id="map"></div>
+                <div class="card-footer text-right polygon-actions">
+                    <button id="clear-polygons" class="btn btn-sm btn-danger mr-2">
+                        <i class="fas fa-trash"></i> Effacer tout
+                    </button>
+                    <button id="save-polygons" class="btn btn-sm btn-success">
+                        <i class="fas fa-save"></i> Sauvegarder
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -64,43 +120,271 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Librairie Leaflet Draw -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
 <script>
     $(document).ready(function() {
         // Initialisation de la carte
         var map = L.map('map').setView([20, 0], 2);
-
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Ajout des marqueurs
+        // Groupe pour les polygones dessinés
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        // Initialisation des outils de dessin
+        const drawControl = new L.Control.Draw({
+            position: 'topright',
+            draw: {
+                polygon: {
+                    shapeOptions: {
+                        color: '#3388ff',
+                        fillColor: '#3388ff',
+                        fillOpacity: 0.2
+                    },
+                    allowIntersection: false,
+                    showArea: true
+                },
+                rectangle: false,
+                circle: false,
+                marker: false,
+                polyline: false,
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: drawnItems,
+                edit: false
+            }
+        });
+        map.addControl(drawControl);
+
+        // Fonction pour créer un polygone hexagone
+        function createHexagon(lat, lng, size) {
+            var points = [];
+            for (var i = 0; i < 6; i++) {
+                var angle = 2 * Math.PI / 6 * i;
+                points.push([
+                    lat + size * Math.cos(angle),
+                    lng + size * Math.sin(angle)
+                ]);
+            }
+            return points;
+        }
+
+        // Ajout des marqueurs ET des polygones
         {% for location in locations %}
             {% if location.latitude and location.longitude %}
-            L.marker([{{ location.latitude }}, {{ location.longitude }}])
-                .addTo(map)
-                .bindPopup(`
-                    <b>{{ location.country }}</b><br>
-                    Population: {{ location.population|default:"N/A" }}
-                `);
+            var size = 0.3 + (Math.log({{ location.population|default:1000000 }}) / 10);
+            
+            var polygon = L.polygon(
+                createHexagon({{ location.latitude }}, {{ location.longitude }}, size),
+                {
+                    color: '#3388ff',
+                    weight: 2,
+                    fillColor: '{% if location.population > 100000000 %}#ff0000{% elif location.population > 50000000 %}#ff8000{% else %}#3388ff{% endif %}',
+                    fillOpacity: 0.3
+                }
+            ).addTo(map);
+
+            var marker = L.marker([{{ location.latitude }}, {{ location.longitude }}], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div class="marker-pin" style="background-color: {% if location.population > 100000000 %}#ff0000{% elif location.population > 50000000 %}#ff8000{% else %}#008000{% endif %};"></div>`,
+                    iconSize: [30, 42],
+                    iconAnchor: [15, 42]
+                })
+            }).addTo(map)
+            .bindPopup(`
+                <div class="text-center">
+                    <h5><b>{{ location.country }}</b></h5>
+                    <hr>
+                    <p>Population: <b>{{ location.population|default:"N/A" }}</b></p>
+                    <p>Latitude: <code>{{ location.latitude|floatformat:4 }}</code></p>
+                    <p>Longitude: <code>{{ location.longitude|floatformat:4 }}</code></p>
+                </div>
+            `);
+
+            polygon.bindPopup(marker.getPopup());
             {% endif %}
         {% endfor %}
 
-        // Auto-refresh toutes les 30s
-        setTimeout(() => location.reload(), 30000);
-
-        // Géocodage automatique
-        $('#id_country').change(function() {
-            const country = $(this).val();
-            if(country) {
-                fetch(`/geocode/?country=${encodeURIComponent(country)}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        if(data.lat && data.lng) {
-                            $('#id_latitude').val(data.lat);
-                            $('#id_longitude').val(data.lng);
-                        }
-                    });
+        // Événement lors de la création d'un polygone
+        map.on(L.Draw.Event.CREATED, function(e) {
+            const layer = e.layer;
+            drawnItems.addLayer(layer);
+            
+            // Calcul des statistiques dans la zone
+            const bounds = layer.getBounds();
+            let totalPopulation = 0;
+            let countries = [];
+            
+            {% for location in locations %}
+            if (bounds.contains([{{ location.latitude }}, {{ location.longitude }}])) {
+                totalPopulation += {{ location.population|default:0 }};
+                countries.push("{{ location.country }}");
             }
+            {% endfor %}
+            
+            // Ajout d'un popup avec statistiques
+            const popupContent = `
+                <div class="text-center">
+                    <h5><b>Zone Personnalisée</b></h5>
+                    <hr>
+                    <p>Pays inclus: <b>${countries.length}</b></p>
+                    <p>Population totale: <b>${totalPopulation.toLocaleString()}</b></p>
+                    <div class="btn-group mt-2">
+                        <button class="btn btn-sm btn-info zoom-to-zone" onclick="map.fitBounds(layer.getBounds(), {padding: [50, 50], maxZoom: 10})">Zoomer</button>
+                        <button class="btn btn-sm btn-danger remove-zone" onclick="map.removeLayer(layer)">Supprimer</button>
+                    </div>
+                </div>
+            `;
+            
+            layer.bindPopup(popupContent).openPopup();
+        });
+
+        // Bouton Effacer tout
+        $('#clear-polygons').click(function() {
+            drawnItems.clearLayers();
+        });
+
+        // Bouton Sauvegarder
+        $('#save-polygons').click(function() {
+            const polygons = [];
+            drawnItems.eachLayer(function(layer) {
+                polygons.push({
+                    geo_json: layer.toGeoJSON(),
+                    bounds: layer.getBounds()
+                });
+            });
+            
+            fetch('/save-polygon/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ polygons: polygons })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    alert('Polygones sauvegardés avec succès!');
+                }
+            });
+        });
+
+        // Fonction de géocodage améliorée
+        function geocodeCountry(country, callback) {
+            if (!country.trim()) {
+                alert("Veuillez entrer un nom de pays valide");
+                return;
+            }
+
+            fetch(`/geocode/?country=${encodeURIComponent(country)}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.latitude && data.longitude) {
+                        callback(data.latitude, data.longitude, country);
+                    } else {
+                        alert("Pays non trouvé! Vérifiez l'orthographe.");
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert("Erreur lors du géocodage: " + error.message);
+                });
+        }
+
+        // Recherche d'un pays - Version optimisée
+        $('#search-btn').click(function() {
+            const country = $('#country-search').val().trim();
+            
+            // Supprimer les marqueurs précédents s'ils existent
+            if (window.tempMarker) map.removeLayer(window.tempMarker);
+            if (window.tempPolygon) map.removeLayer(window.tempPolygon);
+
+            geocodeCountry(country, function(lat, lng, countryName) {
+                // Centrer la carte sur la position trouvée
+                map.setView([lat, lng], 6, {
+                    animate: true,
+                    duration: 1
+                });
+
+                // Créer un marqueur temporaire
+                window.tempMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: '<div class="marker-pin" style="background-color: #ff00ff;"></div>',
+                        iconSize: [30, 42],
+                        iconAnchor: [15, 42]
+                    })
+                }).addTo(map)
+                .bindPopup(`
+                    <div class="text-center">
+                        <h5><b>${countryName}</b></h5>
+                        <hr>
+                        <p>Latitude: <code>${lat.toFixed(4)}</code></p>
+                        <p>Longitude: <code>${lng.toFixed(4)}</code></p>
+                    </div>
+                `)
+                .openPopup();
+
+                // Créer un polygone temporaire
+                window.tempPolygon = L.polygon(
+                    createHexagon(lat, lng, 0.4),
+                    {
+                        color: '#ff00ff',
+                        weight: 2,
+                        fillColor: '#ff00ff',
+                        fillOpacity: 0.2
+                    }
+                ).addTo(map);
+
+                // Supprimer après 15 secondes
+                setTimeout(() => {
+                    if (window.tempMarker) map.removeLayer(window.tempMarker);
+                    if (window.tempPolygon) map.removeLayer(window.tempPolygon);
+                }, 15000);
+            });
+        });
+
+        // Géocodage des éléments en attente
+        $('.geocode-btn').click(function() {
+            var country = $(this).data('country');
+            var id = $(this).data('id');
+            var btn = $(this);
+            
+            btn.html('<i class="fas fa-spinner fa-spin"></i> Géocodage...');
+            btn.prop('disabled', true);
+
+            geocodeCountry(country, function(lat, lng) {
+                $.post(`/update-location/${id}/`, {
+                    latitude: lat,
+                    longitude: lng,
+                    csrfmiddlewaretoken: '{{ csrf_token }}'
+                }, function() {
+                    location.reload();
+                });
+            });
+        });
+
+        // Auto-complétion pour la recherche
+        var availableCountries = [
+            {% for location in locations %}
+                "{{ location.country }}",
+            {% endfor %}
+            {% for location in pending_locations %}
+                "{{ location.country }}",
+            {% endfor %}
+        ];
+        $("#country-search").autocomplete({
+            source: availableCountries
         });
     });
 </script>

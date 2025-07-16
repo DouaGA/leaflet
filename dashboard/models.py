@@ -3,6 +3,7 @@ from geopy.geocoders import Nominatim
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 import logging
+from django.contrib.auth.models import User  # Ajoutez cette ligne
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ class Data(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     last_updated = models.DateTimeField(auto_now=True)
-    
+    views = models.IntegerField(null=True, blank=True, default=0)  # Rendre le champ optionnel
     def __str__(self):
         return self.country
 
@@ -32,3 +33,27 @@ def update_coordinates(sender, instance, created, **kwargs):
                 )
         except Exception as e:
             logger.error(f"Erreur de géocodage pour {instance.country}: {str(e)}")
+
+
+
+class UserDrawnPolygon(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, blank=True)
+    coordinates = models.TextField()  # Stockage JSON en texte
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def get_coordinates(self):
+        import json
+        return json.loads(self.coordinates)
+    
+    def __str__(self):
+        return f"Zone {self.id} - {self.user.username}"
+    # models.py
+class Location(models.Model):
+    country = models.CharField(max_length=100)
+    population = models.IntegerField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    
+    def __str__(self):
+        return self.country

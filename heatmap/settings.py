@@ -30,8 +30,7 @@ if os.name == 'nt':
     elif Path(osgeo_gdal_path).exists():
         GDAL_LIBRARY_PATH = osgeo_gdal_path
         GEOS_LIBRARY_PATH = osgeo_geos_path
-        os.environ['PATH'] = f"C:\OSGeo4W\bin;{os.environ['PATH']}"
-        os.environ['PROJ_LIB'] = r'C:\OSGeo4W\share\proj'
+        os.environ['PATH'] = f"C:\\OSGeo4W\\bin;{os.environ['PATH']}"  # Ou utilisez une raw string
     else:
         GDAL_LIBRARY_PATH = None
         GEOS_LIBRARY_PATH = None
@@ -52,20 +51,23 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
+LEAFLET_CONFIG = {
+    'DEFAULT_CENTER': (20.0, 0.0),
+    'DEFAULT_ZOOM': 2,
+    'SCALE': 'both',
+    'ATTRIBUTION_PREFIX': 'Cartographie Django',
+}
 # Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
+    'django.contrib.auth',  # Doit précéder contenttypes
+    'django.contrib.contenttypes',  # UNE SEULE FOIS
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'dashboard.apps.DashboardConfig',
-    'django.contrib.gis'
+    'dashboard.apps.DashboardConfig',  # Référence complète
 ]
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -105,6 +107,7 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
