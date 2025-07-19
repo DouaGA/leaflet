@@ -21,7 +21,6 @@
     .leaflet-popup-content-wrapper {
         border-radius: 8px;
     }
-    /* Styles pour les outils de dessin */
     .leaflet-draw-toolbar a {
         background-image: url('https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/images/spritesheet.png') !important;
     }
@@ -36,6 +35,55 @@
     }
     .polygon-actions {
         margin-top: 10px;
+    }
+    
+    /* Nouveaux styles ajoutés */
+    .polygon-point {
+        width: 8px;
+        height: 8px;
+        background-color: #3388ff;
+        border-radius: 50%;
+        border: 2px solid white;
+        cursor: move;
+    }
+    #map-container {
+        position: relative;
+        transition: all 0.3s;
+    }
+    #map.fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 100vh !important;
+        z-index: 9999;
+    }
+    #exit-fullscreen {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        display: none;
+        padding: 8px 15px;
+    }
+    .zone-actions {
+        display: flex;
+        gap: 5px;
+        margin-top: 10px;
+    }
+    .zone-actions button {
+        flex: 1;
+    }
+    .search-loading {
+        position: absolute;
+        right: 45px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        color: #6c757d;
+        display: none;
     }
 </style>
 {% endblock %}
@@ -99,12 +147,17 @@
                 <div id="search-container" class="input-group">
                     <input type="text" id="country-search" class="form-control" placeholder="Rechercher un pays...">
                     <div class="input-group-append">
+                        <span class="search-loading" id="search-loading">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </span>
                         <button class="btn btn-primary" id="search-btn">
                             <i class="fas fa-search"></i> Chercher
                         </button>
                     </div>
                 </div>
-                <div id="map"></div>
+                <div id="map-container">
+                    <div id="map"></div>
+                </div>
                 <div class="card-footer text-right polygon-actions">
                     <button id="clear-polygons" class="btn btn-sm btn-danger mr-2">
                         <i class="fas fa-trash"></i> Effacer tout
@@ -117,10 +170,13 @@
         </div>
     </div>
 </div>
+
+<button id="exit-fullscreen" class="btn btn-danger">
+    <i class="fas fa-times"></i> Quitter le zoom
+</button>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Librairie Leaflet Draw -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
@@ -135,7 +191,7 @@
         const drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
 
-        // Initialisation des outils de dessin
+        // Configuration du dessin de polygone avec points
         const drawControl = new L.Control.Draw({
             position: 'topright',
             draw: {
@@ -143,10 +199,17 @@
                     shapeOptions: {
                         color: '#3388ff',
                         fillColor: '#3388ff',
-                        fillOpacity: 0.2
+                        fillOpacity: 0.2,
+                        weight: 2,
+                        dashArray: '5, 5'
                     },
                     allowIntersection: false,
-                    showArea: true
+                    showArea: true,
+                    guidelineDistance: 20,
+                    drawError: {
+                        color: '#b00b00',
+                        timeout: 1000
+                    }
                 },
                 rectangle: false,
                 circle: false,
@@ -160,6 +223,71 @@
             }
         });
         map.addControl(drawControl);
+
+        // Fonction pour ajouter des points aux sommets du polygone
+        function addPolygonPoints(layer) {
+            const latlngs = layer.getLatLngs()[0];
+            
+            latlngs.forEach(latlng => {
+                L.circleMarker(latlng, {
+                    radius: 4,
+                    fillColor: "#3388ff",
+                    color: "#fff",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 1,
+                    draggable: true
+                }).addTo(drawnItems).on('drag', function(e) {
+                    const marker = e.target;
+                    const index = latlngs.findIndex(ll => 
+                        ll.lat === marker.getLatLng().lat && 
+                        ll.lng === marker.getLatLng().lng
+                    );
+                    if (index !== -1) {
+                        latlngs[index] = marker.getLatLng();
+                        layer.setLatLngs([latlngs]);
+                    }
+                });
+            });
+        }
+
+        // Gestion de la création de polygone
+        map.on(L.Draw.Event.CREATED, function(e) {
+            const layer = e.layer;
+            drawnItems.addLayer(layer);
+            addPolygonPoints(layer);
+            
+            layer.bindPopup(`
+                <div class="text-center">
+                    <h5>Zone Sélectionnée</h5>
+                    <div class="zone-actions">
+                        <button class="btn btn-primary btn-sm zoom-to-polygon">
+                            <i class="fas fa-search-plus"></i> Zoomer
+                        </button>
+                        <button class="btn btn-danger btn-sm remove-polygon">
+                            <i class="fas fa-trash"></i> Supprimer
+                        </button>
+                    </div>
+                </div>
+            `);
+            
+            layer.on('popupopen', function() {
+                $('.zoom-to-polygon').click(function() {
+                    $('#map').addClass('fullscreen');
+                    $('#exit-fullscreen').show();
+                    map.fitBounds(layer.getBounds(), {padding: [20, 20]});
+                });
+                $('.remove-polygon').click(function() {
+                    map.removeLayer(layer);
+                });
+            });
+        });
+
+        // Sortie du mode plein écran
+        $('#exit-fullscreen').click(function() {
+            $('#map').removeClass('fullscreen');
+            $(this).hide();
+        });
 
         // Fonction pour créer un polygone hexagone
         function createHexagon(lat, lng, size) {
@@ -211,40 +339,6 @@
             {% endif %}
         {% endfor %}
 
-        // Événement lors de la création d'un polygone
-        map.on(L.Draw.Event.CREATED, function(e) {
-            const layer = e.layer;
-            drawnItems.addLayer(layer);
-            
-            // Calcul des statistiques dans la zone
-            const bounds = layer.getBounds();
-            let totalPopulation = 0;
-            let countries = [];
-            
-            {% for location in locations %}
-            if (bounds.contains([{{ location.latitude }}, {{ location.longitude }}])) {
-                totalPopulation += {{ location.population|default:0 }};
-                countries.push("{{ location.country }}");
-            }
-            {% endfor %}
-            
-            // Ajout d'un popup avec statistiques
-            const popupContent = `
-                <div class="text-center">
-                    <h5><b>Zone Personnalisée</b></h5>
-                    <hr>
-                    <p>Pays inclus: <b>${countries.length}</b></p>
-                    <p>Population totale: <b>${totalPopulation.toLocaleString()}</b></p>
-                    <div class="btn-group mt-2">
-                        <button class="btn btn-sm btn-info zoom-to-zone" onclick="map.fitBounds(layer.getBounds(), {padding: [50, 50], maxZoom: 10})">Zoomer</button>
-                        <button class="btn btn-sm btn-danger remove-zone" onclick="map.removeLayer(layer)">Supprimer</button>
-                    </div>
-                </div>
-            `;
-            
-            layer.bindPopup(popupContent).openPopup();
-        });
-
         // Bouton Effacer tout
         $('#clear-polygons').click(function() {
             drawnItems.clearLayers();
@@ -276,6 +370,84 @@
             });
         });
 
+        // Fonction de recherche améliorée
+        $('#search-btn').click(function() {
+            const country = $('#country-search').val().trim();
+            
+            // Supprimer les marqueurs précédents
+            if (window.searchMarker) map.removeLayer(window.searchMarker);
+            if (window.searchHighlight) map.removeLayer(window.searchHighlight);
+
+            if (!country) {
+                alert("Veuillez entrer un nom de pays");
+                return;
+            }
+
+            // Afficher l'indicateur de chargement
+            const searchBtn = $(this);
+            $('#search-loading').show();
+            searchBtn.prop('disabled', true);
+
+            // Utilisation de l'API Nominatim pour la recherche
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(country)}&limit=1&polygon_geojson=1`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        const result = data[0];
+                        const lat = parseFloat(result.lat);
+                        const lng = parseFloat(result.lon);
+                        
+                        // Centrer la carte sur le résultat
+                        map.setView([lat, lng], 6, {
+                            animate: true,
+                            duration: 1
+                        });
+
+                        // Ajouter un marqueur
+                        window.searchMarker = L.marker([lat, lng], {
+                            icon: L.divIcon({
+                                className: 'custom-marker',
+                                html: '<div class="marker-pin" style="background-color: #ff00ff;"></div>',
+                                iconSize: [30, 42],
+                                iconAnchor: [15, 42]
+                            })
+                        }).addTo(map)
+                        .bindPopup(`
+                            <div class="text-center">
+                                <h5><b>${result.display_name.split(',')[0]}</b></h5>
+                                <hr>
+                                <p>Latitude: <code>${lat.toFixed(4)}</code></p>
+                                <p>Longitude: <code>${lng.toFixed(4)}</code></p>
+                            </div>
+                        `)
+                        .openPopup();
+
+                        // Si des données polygonales sont disponibles
+                        if (result.geojson) {
+                            window.searchHighlight = L.geoJSON(result.geojson, {
+                                style: {
+                                    color: '#ff00ff',
+                                    weight: 2,
+                                    opacity: 1,
+                                    fillOpacity: 0.2
+                                }
+                            }).addTo(map);
+                            map.fitBounds(window.searchHighlight.getBounds());
+                        }
+                    } else {
+                        alert("Pays non trouvé. Vérifiez l'orthographe.");
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur de recherche:', error);
+                    alert("Erreur lors de la recherche. Veuillez réessayer.");
+                })
+                .finally(() => {
+                    $('#search-loading').hide();
+                    searchBtn.prop('disabled', false);
+                });
+        });
+
         // Fonction de géocodage améliorée
         function geocodeCountry(country, callback) {
             if (!country.trim()) {
@@ -300,59 +472,6 @@
                     alert("Erreur lors du géocodage: " + error.message);
                 });
         }
-
-        // Recherche d'un pays - Version optimisée
-        $('#search-btn').click(function() {
-            const country = $('#country-search').val().trim();
-            
-            // Supprimer les marqueurs précédents s'ils existent
-            if (window.tempMarker) map.removeLayer(window.tempMarker);
-            if (window.tempPolygon) map.removeLayer(window.tempPolygon);
-
-            geocodeCountry(country, function(lat, lng, countryName) {
-                // Centrer la carte sur la position trouvée
-                map.setView([lat, lng], 6, {
-                    animate: true,
-                    duration: 1
-                });
-
-                // Créer un marqueur temporaire
-                window.tempMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: '<div class="marker-pin" style="background-color: #ff00ff;"></div>',
-                        iconSize: [30, 42],
-                        iconAnchor: [15, 42]
-                    })
-                }).addTo(map)
-                .bindPopup(`
-                    <div class="text-center">
-                        <h5><b>${countryName}</b></h5>
-                        <hr>
-                        <p>Latitude: <code>${lat.toFixed(4)}</code></p>
-                        <p>Longitude: <code>${lng.toFixed(4)}</code></p>
-                    </div>
-                `)
-                .openPopup();
-
-                // Créer un polygone temporaire
-                window.tempPolygon = L.polygon(
-                    createHexagon(lat, lng, 0.4),
-                    {
-                        color: '#ff00ff',
-                        weight: 2,
-                        fillColor: '#ff00ff',
-                        fillOpacity: 0.2
-                    }
-                ).addTo(map);
-
-                // Supprimer après 15 secondes
-                setTimeout(() => {
-                    if (window.tempMarker) map.removeLayer(window.tempMarker);
-                    if (window.tempPolygon) map.removeLayer(window.tempPolygon);
-                }, 15000);
-            });
-        });
 
         // Géocodage des éléments en attente
         $('.geocode-btn').click(function() {
