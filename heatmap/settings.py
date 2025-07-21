@@ -11,6 +11,20 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv() 
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_OAUTH_KEY')# Votre ID client
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_OAUTH_SECRET')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'openid'
+]
+SOCIAL_AUTH_GOOGLE_OAUTH2_EXTRA_DATA = [
+    ('first_name', 'given_name'),
+    ('last_name', 'family_name'),
+    ('picture', 'picture')
+]
 
 # Chemins par défaut pour Windows
 if os.name == 'nt':
@@ -44,7 +58,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-bj8qo4)m63y=1^5ti8!1+p=3qfrl(@4yd&-&$m=#)3tb*oxha#'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -68,6 +82,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'dashboard.apps.DashboardConfig',
     'django.contrib.gis',
+    'social_django',
+
         # Référence complète
 ]
 MIDDLEWARE = [
@@ -82,13 +98,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'heatmap.urls'
 LOGOUT_REDIRECT_URL = 'dashboard:login'
-# Redirection après login réussi
-
-# Redirection après logout
-# Messages
 MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
-# Assurez-vous que ces paramètres existent
-AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
+
+AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend', 'social_core.backends.google.GoogleOAuth2',
+    'django.contrib.auth.backends.ModelBackend',]
+
 LOGIN_URL = 'dashboard:login'
 LOGIN_REDIRECT_URL = 'dashboard:dashboard'  # Where to redirect after login
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

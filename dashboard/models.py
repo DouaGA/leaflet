@@ -4,6 +4,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 import logging
 from django.contrib.auth.models import User  # Ajoutez cette ligne
+from django.contrib.auth.models import User
+
 
 logger = logging.getLogger(__name__)
 
@@ -57,3 +59,11 @@ class Location(models.Model):
     
     def __str__(self):
         return self.country
+
+class UserSocialAuth(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    provider = models.CharField(max_length=32)
+    uid = models.CharField(max_length=255)
+    
+    class Meta:
+        unique_together = ('provider', 'uid')

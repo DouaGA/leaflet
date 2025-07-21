@@ -116,9 +116,17 @@ def signup_view(request):
     return render(request, 'dashboard/signup.html', {'form': form})
 
 @login_required
-def dashboard_view(request):
-    return render(request, 'dashboard/home.html')
+# views.py
+def dashboard(request):
+    user_data = request.user.social_auth.get(provider='google-oauth2').extra_data
+    print(user_data)  # Voir toutes les données disponibles
 
 def logout_view(request):
     logout(request)
     return redirect('dashboard:login')
+def dashboard_view(request):
+    if request.user.is_authenticated:
+        social = request.user.social_auth.get(provider='google-oauth2')
+        first_name = social.extra_data['given_name']
+        last_name = social.extra_data['family_name']
+        photo_url = social.extra_data['picture']

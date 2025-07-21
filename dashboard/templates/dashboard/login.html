@@ -62,6 +62,11 @@
             <a href="{% url 'dashboard:signup' %}" class="auth-link">Créer un compte</a>
             <a href="{% url 'password_reset' %}" class="auth-link">Mot de passe oublié?</a>    </form>
 </div>
+<div class="social">
+    <a href="{% url 'social:begin' 'google-oauth2' %}" class="go">
+        <i class="fab fa-google"></i> Se connecter avec Google
+    </a>
+</div>
 {% endblock %}
 
 {% block extra_css %}
