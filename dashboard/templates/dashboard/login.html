@@ -52,21 +52,21 @@
         {% endif %}
 
         <button type="submit" class="primary-btn">Se connecter</button>
-        
-        <div class="social">
-            <div class="go"><i class="fab fa-google"></i> Google</div>
-            <div class="fb"><i class="fab fa-facebook"></i> Facebook</div>
+        <div class="social-container">
+            <div class="social-buttons">
+                <a href="{% url 'social:begin' 'google-oauth2' %}" class="social-btn go">
+                    <i class="fab fa-google"></i> Se connecter avec Google
+                </a>
+                <a href="#" class="social-btn fb">
+                    <i class="fab fa-facebook"></i> Facebook
+                </a>
+            </div>
         </div>
-        
         <div class="auth-links">
             <a href="{% url 'dashboard:signup' %}" class="auth-link">Créer un compte</a>
             <a href="{% url 'password_reset' %}" class="auth-link">Mot de passe oublié?</a>    </form>
 </div>
-<div class="social">
-    <a href="{% url 'social:begin' 'google-oauth2' %}" class="go">
-        <i class="fab fa-google"></i> Se connecter avec Google
-    </a>
-</div>
+
 {% endblock %}
 
 {% block extra_css %}
@@ -183,28 +183,63 @@
         background-color: rgba(255, 255, 255, 0.8);
     }
     
-    .social {
+    .social-container {
         margin-top: 30px;
+    }
+
+    .social-buttons {
         display: flex;
         justify-content: space-between;
+        gap: 15px;
     }
-    
-    .social div {
+
+    .social-btn {
         width: 48%;
-        border-radius: 3px;
-        padding: 10px 0;
+        border-radius: 8px;
+        padding: 12px 0;
         text-align: center;
         cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        text-decoration: none;
+        color: white;
     }
-    
-    .social .fb {
+
+    .social-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .social-btn i {
+        margin-right: 8px;
+        font-size: 18px;
+    }
+
+    .social-btn.fb {
         background-color: #4267B2;
     }
-    
-    .social .go {
+
+    .social-btn.fb:hover {
+        background-color: #3b5998;
+    }
+
+    .social-btn.go {
         background-color: #DB4437;
     }
-    
+
+    .social-btn.go:hover {
+        background-color: #c23321;
+    }
+
+    /* Animation au clic */
+    .social-btn:active {
+        transform: translateY(1px);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+        
     .auth-links {
         margin-top: 20px;
         display: flex;

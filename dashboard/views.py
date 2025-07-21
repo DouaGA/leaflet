@@ -12,6 +12,7 @@ from .models import Data, UserDrawnPolygon
 from .forms import DataForm
 from django.contrib.auth.views import LoginView
 from .forms import CustomUserCreationForm, DataForm  # Ajoutez CustomUserCreationForm ici
+from social_django.models import UserSocialAuth
 
 # Vue principale
 def index(request):
@@ -124,9 +125,32 @@ def dashboard(request):
 def logout_view(request):
     logout(request)
     return redirect('dashboard:login')
+@login_required
 def dashboard_view(request):
-    if request.user.is_authenticated:
-        social = request.user.social_auth.get(provider='google-oauth2')
-        first_name = social.extra_data['given_name']
-        last_name = social.extra_data['family_name']
-        photo_url = social.extra_data['picture']
+    context = {}
+    
+    # Only try to get social auth data if user logged in via Google
+    if hasattr(request.user, 'social_auth'):
+        try:
+            social = request.user.social_auth.get(provider='google-oauth2')
+            context.update({
+                'first_name': social.extra_data.get('given_name', ''),
+                'last_name': social.extra_data.get('family_name', ''),
+                'photo_url': social.extra_data.get('picture', ''),
+            })
+        except UserSocialAuth.DoesNotExist:
+            # User didn't log in via Google, use regular user data
+            context.update({
+                'first_name': request.user.first_name,
+                'last_name': request.user.last_name,
+                'photo_url': '',  # No photo for regular users
+            })
+    else:
+        # Regular Django auth user
+        context.update({
+            'first_name': request.user.first_name,
+            'last_name': request.user.last_name,
+            'photo_url': '',  # No photo for regular users
+        })
+    
+    return render(request, 'dashboard/home.html', context)
