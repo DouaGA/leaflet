@@ -1,0 +1,167 @@
+{% extends "dashboard/base_auth.html" %}
+
+{% block title %}Inscription SIG{% endblock %}
+
+{% block content %}
+<div class="auth-form-container">
+    <form method="post" action="{% url 'dashboard:signup' %}" class="auth-form">
+        {% csrf_token %}
+        <h3>Inscription SIG</h3>
+        {% if form.errors %}
+    <div class="alert alert-error">
+        {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+        {% endfor %}
+    </div>
+    {% endif %}
+        <label for="username">Nom d'utilisateur</label>
+        <input type="text" placeholder="Nom d'utilisateur" name="username" id="username" required>
+
+        <label for="email">Email</label>
+        <input type="email" placeholder="Email" name="email" id="email" required>
+
+        <label for="password1">Mot de passe</label>
+        <input type="password" placeholder="Mot de passe" id="password1" name="password1" required>
+
+        <label for="password2">Confirmer le mot de passe</label>
+        <input type="password" placeholder="Confirmer le mot de passe" id="password2" name="password2" required>
+
+        <button type="submit" class="primary-btn">S'inscrire</button>
+        
+        <div class="auth-links">
+            <span>Déjà un compte?</span>
+            <a href="{% url 'dashboard:login' %}" class="auth-link">Se connecter</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .alert-error {
+    background-color: #f44336;
+    color: white;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+    .auth-form-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .auth-form {
+        width: 450px;
+        background-color: var(--form-bg);
+        color: var(--text-light);
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 0 40px rgba(8, 7, 16, 0.6);
+        padding: 50px 35px;
+    }
+    
+    .auth-form * {
+        color: var(--text-light);
+        letter-spacing: 0.5px;
+        outline: none;
+        border: none;
+    }
+    
+    .auth-form h3 {
+        font-size: 32px;
+        font-weight: 500;
+        line-height: 42px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    
+    label {
+        display: block;
+        margin-top: 20px;
+        font-size: 16px;
+        font-weight: 500;
+    }
+    
+    input {
+        display: block;
+        height: 50px;
+        width: 100%;
+        background-color: rgba(255, 255, 255, 0.07);
+        border-radius: 3px;
+        padding: 0 10px;
+        margin-top: 8px;
+        font-size: 14px;
+        font-weight: 300;
+    }
+    
+    ::placeholder {
+        color: #e5e5e5;
+    }
+    
+    .primary-btn {
+        margin-top: 30px;
+        width: 100%;
+        background-color: #ffffff;
+        color: #080710;
+        padding: 15px 0;
+        font-size: 18px;
+        font-weight: 600;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .primary-btn:hover {
+        background-color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .auth-links {
+        margin-top: 25px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        font-size: 14px;
+    }
+    
+    .auth-link {
+        color: var(--accent-blue);
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+    
+    .auth-link:hover {
+        color: #1845ad;
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const password1 = document.getElementById('password1').value;
+        const password2 = document.getElementById('password2').value;
+        
+        if (password1 !== password2) {
+            alert("Les mots de passe ne correspondent pas!");
+            e.preventDefault();
+        }
+    });
+</script>
+{% endblock %}

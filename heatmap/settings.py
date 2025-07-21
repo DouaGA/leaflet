@@ -49,7 +49,7 @@ SECRET_KEY = 'django-insecure-bj8qo4)m63y=1^5ti8!1+p=3qfrl(@4yd&-&$m=#)3tb*oxha#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (20.0, 0.0),
@@ -66,7 +66,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'dashboard.apps.DashboardConfig',  # Référence complète
+    'dashboard.apps.DashboardConfig',
+    'django.contrib.gis',
+        # Référence complète
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -79,11 +81,34 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'heatmap.urls'
+LOGOUT_REDIRECT_URL = 'dashboard:login'
+# Redirection après login réussi
+
+# Redirection après logout
+# Messages
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
+# Assurez-vous que ces paramètres existent
+AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
+LOGIN_URL = 'admin:login'
+LOGIN_REDIRECT_URL = 'login'
+
+# Configuration des sessions
+AUTH_PASSWORD_VALIDATORS = []
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000']
+
+# Dans settings.py
+CSRF_COOKIE_SECURE = False  # Désactive en développement
+SESSION_COOKIE_SECURE = False  # Désactive en développement
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_HTTPONLY = True
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR/'templates'],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'templates'),
+            os.path.join(BASE_DIR, 'dashboard/templates'),
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -103,8 +128,12 @@ WSGI_APPLICATION = 'heatmap.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',  # Utilisez SQLite standard
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',  # Utilisez le backend PostGIS
+        'NAME': 'heatmap_db',                                # Nom de votre base PostgreSQL
+        'USER': 'postgres',                                  # Utilisateur PostgreSQL (par défaut: postgres)
+        'PASSWORD': '1234',                    # Mot de passe PostgreSQL
+        'HOST': 'localhost',                                 # Ou l'adresse IP de votre serveur
+        'PORT': '5432',                                      # Port par défaut de PostgreSQL
     }
 }
 
@@ -144,7 +173,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

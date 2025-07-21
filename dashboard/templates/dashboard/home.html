@@ -1,0 +1,31 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="mb-4">Bienvenue sur votre Dashboard SIG</h1>
+            {% if user.is_authenticated %}
+                <div class="alert alert-success">
+                    <p>Vous êtes connecté en tant que <strong>{{ user.username }}</strong></p>
+                    <a href="{% url 'dashboard:logout' %}" class="btn btn-danger">Déconnexion</a>
+                </div>
+                
+                <!-- Contenu spécifique au dashboard -->
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Vos outils SIG</h5>
+                        <p class="card-text">Contenu de votre dashboard ici...</p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-warning">
+                    <p>Vous n'êtes pas connecté.</p>
+                    <a href="{% url 'login' %}" class="btn btn-primary">Connexion</a>
+                    <a href="{% url 'signup' %}" class="btn btn-secondary">Inscription</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
