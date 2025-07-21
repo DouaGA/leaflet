@@ -1,9 +1,7 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login as auth_login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import UserCreationForm
-from django.urls import reverse
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from geopy.geocoders import Nominatim
@@ -11,9 +9,11 @@ from django.db.models import Q
 from django.core import serializers
 import json
 from .models import Data, UserDrawnPolygon
-from .forms import DataForm  # Import depuis votre app
+from .forms import DataForm
+from django.contrib.auth.views import LoginView
 from .forms import CustomUserCreationForm, DataForm  # Ajoutez CustomUserCreationForm ici
-# Vos fonctions existantes (conservées inchangées)
+
+# Vue principale
 def index(request):
     if request.method == 'POST':
         form = DataForm(request.POST)
@@ -30,28 +30,24 @@ def index(request):
     locations = Data.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
     pending = Data.objects.filter(Q(latitude__isnull=True) | Q(longitude__isnull=True))
     
-    locations_json = serializers.serialize('json', locations)
-    
     context = {
         'locations': locations,
         'pending_locations': pending,
         'form': form,
-        'locations_json': locations_json,
     }
     return render(request, 'dashboard/index.html', context)
 
+# API Geocoding
 @require_GET
 def geocode_view(request):
     """Vue pour géocoder une adresse"""
     address = request.GET.get('address', '')
-
     if not address:
         return JsonResponse({'error': 'Address parameter is required'}, status=400)
 
     try:
         geolocator = Nominatim(user_agent="heatmap_app")
         location = geolocator.geocode(address)
-
         if location:
             return JsonResponse({
                 'latitude': location.latitude,
@@ -59,10 +55,10 @@ def geocode_view(request):
                 'address': location.address
             })
         return JsonResponse({'error': 'Location not found'}, status=404)
-
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+# Gestion des polygones
 @require_POST
 def save_polygon(request):
     if request.method == 'POST':
@@ -78,45 +74,51 @@ def save_polygon(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
     return JsonResponse({'status': 'invalid_method'}, status=405)
-
 def load_polygons(request):
     polygons = UserDrawnPolygon.objects.filter(user=request.user).values('id', 'name', 'geo_json')
     return JsonResponse(list(polygons), safe=False)
 
-# Système d'authentification amélioré (nouveaux ajouts)
-from django.contrib.auth import login as auth_login  # Évitez les conflits de noms
-
-from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login
-
+# Authentification
+class CustomLoginView(LoginView):
+    template_name = 'dashboard/login.html'
+    redirect_authenticated_user = True
 def login_view(request):
     if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['password']
+        username = request.POST.get('username')
+        password = request.POST.get('password')
         user = authenticate(request, username=username, password=password)
         if user is not None:
-            login(request, user)
-            return redirect('dashboard:home')  # Redirige vers le dashboard après login
+            auth_login(request, user)
+            return redirect('dashboard:dashboard')
         else:
-            # Gérer l'erreur d'authentification
-            return render(request, 'dashboard/login.html', {'error': 'Identifiants invalides'})
+            messages.error(request, 'Invalid username or password')
     return render(request, 'dashboard/login.html')
+from django.contrib.auth.views import LoginView
 
-def dashboard_view(request):
-    if not request.user.is_authenticated:
-        return redirect('dashboard:login')  # Redirige si non connecté
-    return render(request, 'dashboard/home.html')
-
+class CustomLoginView(LoginView):
+    template_name = 'dashboard/login.html'
+    redirect_authenticated_user = True
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Remove password reset from context if needed
+        return context
+    
 def signup_view(request):
     if request.method == 'POST':
-        form = UserCreationForm(request.POST)
+        form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('dashboard:login')
+            user = form.save()
+            auth_login(request, user)
+            return redirect('dashboard:dashboard')
     else:
-        form = UserCreationForm()
+        form = CustomUserCreationForm()
     return render(request, 'dashboard/signup.html', {'form': form})
+
+@login_required
+def dashboard_view(request):
+    return render(request, 'dashboard/home.html')
 
 def logout_view(request):
     logout(request)
-    return redirect('dashboard:login')  # Notez le namespace 'dashboard:'
+    return redirect('dashboard:login')

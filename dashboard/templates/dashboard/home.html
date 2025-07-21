@@ -1,31 +1,72 @@
 {% extends "dashboard/base.html" %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <div class="row">
         <div class="col-md-12">
-            <h1 class="mb-4">Bienvenue sur votre Dashboard SIG</h1>
-            {% if user.is_authenticated %}
-                <div class="alert alert-success">
-                    <p>Vous êtes connecté en tant que <strong>{{ user.username }}</strong></p>
-                    <a href="{% url 'dashboard:logout' %}" class="btn btn-danger">Déconnexion</a>
-                </div>
-                
-                <!-- Contenu spécifique au dashboard -->
-                <div class="card mt-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Vos outils SIG</h5>
-                        <p class="card-text">Contenu de votre dashboard ici...</p>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Dashboard SIG</h1>
+                <a href="{% url 'dashboard:logout' %}" class="btn btn-danger">Déconnexion</a>
+            </div>
+
+            <!-- Section Dashboard qui s'affiche directement -->
+            <div class="dashboard-content">
+                <div class="row">
+                    <!-- Carte 1 -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title">Visualisation Cartographique</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="map" style="height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Carte 2 -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="card-title">Données Spatiales</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">Gestion des couches vectorielles et raster</p>
+                                <ul class="list-group">
+                                    <li class="list-group-item">Couche 1</li>
+                                    <li class="list-group-item">Couche 2</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Carte 3 -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="card-title">Analyse Spatiale</h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">Outils d'analyse géospatiale</p>
+                                <button class="btn btn-sm btn-outline-info">Buffer</button>
+                                <button class="btn btn-sm btn-outline-info">Intersection</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            {% else %}
-                <div class="alert alert-warning">
-                    <p>Vous n'êtes pas connecté.</p>
-                    <a href="{% url 'login' %}" class="btn btn-primary">Connexion</a>
-                    <a href="{% url 'signup' %}" class="btn btn-secondary">Inscription</a>
-                </div>
-            {% endif %}
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+// Initialisation de la carte Leaflet
+document.addEventListener('DOMContentLoaded', function() {
+    const map = L.map('map').setView([51.505, -0.09], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+});
+</script>
+
 {% endblock %}

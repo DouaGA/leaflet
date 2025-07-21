@@ -89,8 +89,9 @@ LOGOUT_REDIRECT_URL = 'dashboard:login'
 MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
 # Assurez-vous que ces paramètres existent
 AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend']
-LOGIN_URL = 'admin:login'
-LOGIN_REDIRECT_URL = 'login'
+LOGIN_URL = 'dashboard:login'
+LOGIN_REDIRECT_URL = 'dashboard:dashboard'  # Where to redirect after login
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Configuration des sessions
 AUTH_PASSWORD_VALIDATORS = []

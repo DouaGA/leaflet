@@ -3,63 +3,103 @@
 {% block title %}Connexion SIG{% endblock %}
 
 {% block content %}
-<div class="background">
-    <div class="shape"></div>
-    <div class="shape"></div>
+<div class="auth-container">
+    <div class="background">
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+
+    <!-- Système de notifications amélioré -->
+    {% if messages %}
+    <div class="notification-system">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'dashboard:login' %}" class="auth-form">
+        {% csrf_token %}
+        
+        <!-- Champ caché pour la redirection -->
+        <input type="hidden" name="next" value="{{ next|default:'' }}">
+        
+        <h3>Connexion SIG</h3>
+
+        <label for="username">Nom d'utilisateur</label>
+        <input type="text" 
+               id="username" 
+               name="username" 
+               value="{{ form.username.value|default:'' }}" 
+               placeholder="Email ou nom d'utilisateur" 
+               required
+               class="{% if form.errors %}input-error{% endif %}">
+
+        <label for="password">Mot de passe</label>
+        <input type="password" 
+               id="password" 
+               name="password" 
+               placeholder="Mot de passe" 
+               required
+               class="{% if form.errors %}input-error{% endif %}">
+
+        {% if form.errors %}
+        <div class="form-error">
+            Identifiants incorrects. Veuillez réessayer.
+        </div>
+        {% endif %}
+
+        <button type="submit" class="primary-btn">Se connecter</button>
+        
+        <div class="social">
+            <div class="go"><i class="fab fa-google"></i> Google</div>
+            <div class="fb"><i class="fab fa-facebook"></i> Facebook</div>
+        </div>
+        
+        <div class="auth-links">
+            <a href="{% url 'dashboard:signup' %}" class="auth-link">Créer un compte</a>
+            <a href="{% url 'password_reset' %}" class="auth-link">Mot de passe oublié?</a>    </form>
 </div>
-
-<!-- Système de notifications amélioré -->
-{% if messages %}
-<div class="notification-system">
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">
-        {{ message }}
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
-<form method="post" action="{% url 'dashboard:login' %}" class="auth-form">
-    {% csrf_token %}
-    
-    <!-- Champ caché pour la redirection -->
-    <input type="hidden" name="next" value="{{ request.GET.next }}">
-    
-    <h3>Connexion SIG</h3>
-
-    <label for="username">Nom d'utilisateur</label>
-    <input type="text" 
-           id="username" 
-           name="username" 
-           value="{{ username|default:'' }}" 
-           placeholder="Email ou nom d'utilisateur" 
-           required
-           class="{% if error %}input-error{% endif %}">
-
-    <label for="password">Mot de passe</label>
-    <input type="password" 
-           id="password" 
-           name="password" 
-           placeholder="Mot de passe" 
-           required
-           class="{% if error %}input-error{% endif %}">
-
-    <button type="submit" class="primary-btn">Se connecter</button>
-    
-    <div class="social">
-        <div class="go"><i class="fab fa-google"></i> Google</div>
-        <div class="fb"><i class="fab fa-facebook"></i> Facebook</div>
-    </div>
-    
-    <div class="auth-links">
-        <a href="{% url 'dashboard:signup' %}" class="auth-link">Créer un compte</a>
-        <a href="#" class="auth-link">Mot de passe oublié?</a>
-    </div>
-</form>
 {% endblock %}
 
 {% block extra_css %}
 <style>
+    .auth-container {
+        position: relative;
+        min-height: 100vh;
+        overflow: hidden;
+    }
+    
+    .background {
+        width: 430px;
+        height: 520px;
+        position: absolute;
+        transform: translate(-50%, -50%);
+        left: 50%;
+        top: 50%;
+    }
+    
+    .background .shape {
+        height: 200px;
+        width: 200px;
+        position: absolute;
+        border-radius: 50%;
+    }
+    
+    .shape:first-child {
+        background: linear-gradient(#1845ad, #23a2f6);
+        left: -80px;
+        top: -80px;
+    }
+    
+    .shape:last-child {
+        background: linear-gradient(to right, #ff512f, #f09819);
+        right: -80px;
+        bottom: -80px;
+    }
+    
     .auth-form {
         height: 520px;
         width: 400px;
@@ -73,9 +113,11 @@
         border: 2px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 0 40px rgba(8, 7, 16, 0.6);
         padding: 50px 35px;
+        z-index: 10;
     }
     
     .auth-form * {
+        font-family: 'Poppins', sans-serif;
         color: #ffffff;
         letter-spacing: 0.5px;
         outline: none;
@@ -113,8 +155,14 @@
         color: #e5e5e5;
     }
     
+    .form-error {
+        color: #ff6b6b;
+        font-size: 14px;
+        margin-top: 10px;
+    }
+    
     .primary-btn {
-        margin-top: 50px;
+        margin-top: 30px;
         width: 100%;
         background-color: #ffffff;
         color: #080710;
@@ -215,9 +263,28 @@
 
 {% block extra_js %}
 <script>
-    document.querySelector('form').addEventListener('submit', function(e) {
-        console.log('Form submission started');
-        // Vos traitements JS existants
+    document.addEventListener('DOMContentLoaded', function() {
+        // Focus sur le champ username au chargement
+        document.getElementById('username').focus();
+        
+        // Gestion des erreurs
+        {% if form.errors %}
+            document.getElementById('password').value = '';
+        {% endif %}
+        
+        // Animation des boutons sociaux
+        const socialButtons = document.querySelectorAll('.social div');
+        socialButtons.forEach(button => {
+            button.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-2px)';
+                this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+            });
+            
+            button.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+                this.style.boxShadow = '';
+            });
+        });
     });
 </script>
 {% endblock %}
