@@ -2,19 +2,18 @@ from django import forms
 from django.urls import reverse
 from .models import Data
 from django.contrib.auth.views import LoginView
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import get_user_model
 
 class DataForm(forms.ModelForm):
     class Meta:
         model = Data
-        fields = ['country', 'population']
+        fields = ['country', 'population', 'image']  # Ajoutez 'image' aux champs
         widgets = {
             'country': forms.TextInput(attrs={'class': 'form-control'}),
-            'population': forms.NumberInput(attrs={'class': 'form-control'})
+            'population': forms.NumberInput(attrs={'class': 'form-control'}),
+            'image': forms.FileInput(attrs={'class': 'form-control-file'})  # Widget pour le téléchargement d'image
         }
-        # forms.py
-from django import forms
-from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import get_user_model
 
 User = get_user_model()
 

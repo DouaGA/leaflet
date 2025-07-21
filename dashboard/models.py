@@ -14,8 +14,10 @@ class Data(models.Model):
     population = models.PositiveIntegerField(default=0)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    image = models.ImageField(upload_to='country_images/', null=True, blank=True)  # Nouveau champ pour l'image
     last_updated = models.DateTimeField(auto_now=True)
-    views = models.IntegerField(null=True, blank=True, default=0)  # Rendre le champ optionnel
+    views = models.IntegerField(null=True, blank=True, default=0)
+
     def __str__(self):
         return self.country
 

@@ -15,9 +15,11 @@ from .forms import CustomUserCreationForm, DataForm  # Ajoutez CustomUserCreatio
 from social_django.models import UserSocialAuth
 
 # Vue principale
+# views.py
+
 def index(request):
     if request.method == 'POST':
-        form = DataForm(request.POST)
+        form = DataForm(request.POST, request.FILES)  # N'oubliez pas request.FILES pour les images
         if form.is_valid():
             instance = form.save()
             messages.success(
@@ -26,8 +28,9 @@ def index(request):
                 f"Latitude: {instance.latitude}, Longitude: {instance.longitude}"
             )
             return redirect('dashboard:index')
+    else:
+        form = DataForm()
 
-    form = DataForm()
     locations = Data.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
     pending = Data.objects.filter(Q(latitude__isnull=True) | Q(longitude__isnull=True))
     

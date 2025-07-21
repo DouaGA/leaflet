@@ -97,8 +97,7 @@
                 <h4 class="mb-0">Ajouter un nouveau pays</h4>
             </div>
             <div class="card-body">
-                <form method="POST" id="country-form">
-                    {% csrf_token %}
+                <form method="POST" id="country-form" enctype="multipart/form-data">                        {% csrf_token %}
                     <div class="form-group">
                         {{ form.as_p }}
                     </div>
@@ -303,41 +302,31 @@
         }
 
         // Ajout des marqueurs ET des polygones
-        {% for location in locations %}
-            {% if location.latitude and location.longitude %}
-            var size = 0.3 + (Math.log({{ location.population|default:1000000 }}) / 10);
-            
-            var polygon = L.polygon(
-                createHexagon({{ location.latitude }}, {{ location.longitude }}, size),
-                {
-                    color: '#3388ff',
-                    weight: 2,
-                    fillColor: '{% if location.population > 100000000 %}#ff0000{% elif location.population > 50000000 %}#ff8000{% else %}#3388ff{% endif %}',
-                    fillOpacity: 0.3
-                }
-            ).addTo(map);
-
-            var marker = L.marker([{{ location.latitude }}, {{ location.longitude }}], {
-                icon: L.divIcon({
-                    className: 'custom-marker',
-                    html: `<div class="marker-pin" style="background-color: {% if location.population > 100000000 %}#ff0000{% elif location.population > 50000000 %}#ff8000{% else %}#008000{% endif %};"></div>`,
-                    iconSize: [30, 42],
-                    iconAnchor: [15, 42]
-                })
-            }).addTo(map)
-            .bindPopup(`
-                <div class="text-center">
-                    <h5><b>{{ location.country }}</b></h5>
-                    <hr>
-                    <p>Population: <b>{{ location.population|default:"N/A" }}</b></p>
-                    <p>Latitude: <code>{{ location.latitude|floatformat:4 }}</code></p>
-                    <p>Longitude: <code>{{ location.longitude|floatformat:4 }}</code></p>
-                </div>
-            `);
-
-            polygon.bindPopup(marker.getPopup());
-            {% endif %}
+            {% for location in locations %}
+                {% if location.latitude and location.longitude %}
+                    var marker = L.marker([{{ location.latitude }}, {{ location.longitude }}], {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div class="marker-pin" style="background-color: {% if location.population > 100000000 %}#ff0000{% elif location.population > 50000000 %}#ff8000{% else %}#008000{% endif %};"></div>`,
+                            iconSize: [30, 42],
+                            iconAnchor: [15, 42]
+                        })
+                    }).addTo(map)
+                    .bindPopup(`
+                        <div class="text-center">
+                            <h5><b>{{ location.country }}</b></h5>
+                            <hr>
+                            {% if location.image %}
+                                <img src="{{ location.image.url }}" alt="{{ location.country }}" style="max-width: 200px; max-height: 150px; margin-bottom: 10px;">
+                            {% endif %}
+                            <p>Population: <b>{{ location.population|default:"N/A" }}</b></p>
+                            <p>Latitude: <code>{{ location.latitude|floatformat:4 }}</code></p>
+                            <p>Longitude: <code>{{ location.longitude|floatformat:4 }}</code></p>
+                        </div>
+                    `);
+                {% endif %}
         {% endfor %}
+
 
         // Bouton Effacer tout
         $('#clear-polygons').click(function() {
