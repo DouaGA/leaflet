@@ -14,4 +14,6 @@ urlpatterns = [
     path('geocode/', views.geocode_view, name='geocode'),
     path('save-polygon/', views.save_polygon, name='save_polygon'),
     path('load-polygons/', views.load_polygons, name='load_polygons'),
+    path('save-position/', views.save_position, name='position'),
+
 ]

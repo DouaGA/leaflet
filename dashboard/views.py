@@ -13,6 +13,9 @@ from .forms import DataForm
 from django.contrib.auth.views import LoginView
 from .forms import CustomUserCreationForm, DataForm  # Ajoutez CustomUserCreationForm ici
 from social_django.models import UserSocialAuth
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
 
 # Vue principale
 # views.py
@@ -157,3 +160,23 @@ def dashboard_view(request):
         })
     
     return render(request, 'dashboard/home.html', context)
+@login_required
+@csrf_exempt
+def save_position(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            latitude = data.get('latitude')
+            longitude = data.get('longitude')
+            
+            # Enregistrez la position dans votre modèle
+            # Exemple:
+            # user_profile = request.user.profile
+            # user_profile.latitude = latitude
+            # user_profile.longitude = longitude
+            # user_profile.save()
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Méthode non autorisée'})

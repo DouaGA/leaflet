@@ -17,7 +17,7 @@ class Data(models.Model):
     image = models.ImageField(upload_to='country_images/', null=True, blank=True)  # Nouveau champ pour l'image
     last_updated = models.DateTimeField(auto_now=True)
     views = models.IntegerField(null=True, blank=True, default=0)
-
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # Ajoutez cette ligne
     def __str__(self):
         return self.country
 
