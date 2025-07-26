@@ -4,6 +4,7 @@ from .models import Data
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
+from .models import UserPosition
 
 class DataForm(forms.ModelForm):
     class Meta:
@@ -36,3 +37,12 @@ class CustomLoginView(LoginView):
 
     def get_success_url(self):
         return reverse('dashboard:dashboard')  # Redirect to dashboard after login
+
+class PositionForm(forms.ModelForm):
+    class Meta:
+        model = UserPosition
+        fields = ['first_name', 'last_name', 'latitude', 'longitude', 'photo']
+        widgets = {
+            'latitude': forms.HiddenInput(),
+            'longitude': forms.HiddenInput(),
+        }

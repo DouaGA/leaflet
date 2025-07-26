@@ -1,683 +1,405 @@
 {% extends "dashboard/base.html" %}
 
-{% block title %}Tableau de Bord Cartographique{% endblock %}
+{% block title %}Enregistrement de Position avec Photo{% endblock %}
 
 {% block extra_css %}
 <style>
-    #map { height: 500px; }
-    .pending-list { max-height: 300px; overflow-y: auto; }
-    #search-container { margin-bottom: 15px; }
-    .coordinates-info { margin-top: 15px; }
-    .custom-marker .marker-pin {
-        width: 30px;
-        height: 30px;
-        border-radius: 50% 50% 50% 0;
-        position: absolute;
-        transform: rotate(-45deg);
-        left: 50%;
-        top: 50%;
-        margin: -15px 0 0 -15px;
-    }
-    .leaflet-popup-content-wrapper {
+    #map { 
+        height: 500px;
+        width: 100%;
         border-radius: 8px;
+        margin-bottom: 20px;
     }
-    .leaflet-draw-toolbar a {
-        background-image: url('https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/images/spritesheet.png') !important;
-    }
-    .leaflet-draw-toolbar .leaflet-draw-draw-polygon {
-        background-position: -2px -2px !important;
-    }
-    .leaflet-draw-toolbar .leaflet-draw-edit-edit {
-        background-position: -62px -2px !important;
-    }
-    .leaflet-draw-toolbar .leaflet-draw-edit-remove {
-        background-position: -122px -2px !important;
-    }
-    .polygon-actions {
-        margin-top: 10px;
-    }
-    
-    /* Nouveaux styles ajoutés */
-    .polygon-point {
-        width: 8px;
-        height: 8px;
+    .user-marker {
         background-color: #3388ff;
         border-radius: 50%;
-        border: 2px solid white;
-        cursor: move;
+        border: 3px solid white;
+        width: 30px;
+        height: 30px;
     }
-    #map-container {
-        position: relative;
-        transition: all 0.3s;
+    .form-container {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
     }
-    #map.fullscreen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 100vh !important;
-        z-index: 9999;
-    }
-    #exit-fullscreen {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 10000;
-        display: none;
-        padding: 8px 15px;
-    }
-    .zone-actions {
-        display: flex;
-        gap: 5px;
-        margin-top: 10px;
-    }
-    .zone-actions button {
-        flex: 1;
-    }
-    .search-loading {
-        position: absolute;
-        right: 45px;
-        top: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-        color: #6c757d;
+    #photo-preview {
+        margin-top: 15px;
         display: none;
     }
-    #locate-me {
-        background-color: #17a2b8;
-        color: white;
-}
-
-    #save-position {
-        transition: all 0.3s;
-}
-
-    #save-position:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-}
+    #preview-img {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+    }
+    .position-photo {
+        max-width: 100px;
+        max-height: 100px;
+    }
+    .error-message {
+        color: #dc3545;
+        font-size: 0.875em;
+    }
+    .is-invalid {
+        border-color: #dc3545;
+    }
+    #save-btn .spinner {
+        display: none;
+    }
+    #save-btn.loading .spinner {
+        display: inline-block;
+    }
+    #save-btn.loading .text {
+        display: none;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-6">
-        <!-- Formulaire d'ajout de pays -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h4 class="mb-0">Ajouter un nouveau pays</h4>
-            </div>
-            <div class="card-body">
-                <form method="POST" id="country-form" enctype="multipart/form-data">
-                    {% csrf_token %}
+<div class="container">
+    <div id="alerts-container"></div>
+    
+    <h2 class="mb-4">Enregistrer ma position avec photo</h2>
+    
+    <div id="map"></div>
+    
+    <div class="form-container">
+        <form id="position-form" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-6">
                     <div class="form-group">
-                        {{ form.as_p }}
+                        <label>Prénom*</label>
+                        <input type="text" id="first-name" name="first_name" class="form-control" required>
+                        <div id="first-name-error" class="error-message"></div>
                     </div>
-                    <!-- Ajout des champs cachés pour les coordonnées -->
-                    <input type="hidden" id="id_latitude" name="latitude">
-                    <input type="hidden" id="id_longitude" name="longitude">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Enregistrer
-                    </button>
-                </form>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Nom*</label>
+                        <input type="text" id="last-name" name="last_name" class="form-control" required>
+                        <div id="last-name-error" class="error-message"></div>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <!-- Liste en attente de géocodage -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">En attente de géocodage</h4>
-                <span class="badge badge-warning">{{ pending_locations|length }}</span>
+            
+            <div class="form-group">
+                <label>Position* (cliquez sur la carte)</label>
+                <div class="row">
+                    <div class="col-md-6">
+                        <input type="text" id="latitude" name="latitude" class="form-control" placeholder="Latitude" readonly required>
+                        <div id="latitude-error" class="error-message"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" id="longitude" name="longitude" class="form-control" placeholder="Longitude" readonly required>
+                        <div id="longitude-error" class="error-message"></div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body pending-list">
-                {% if pending_locations %}
-                    <ul class="list-group">
-                        {% for location in pending_locations %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ location.country }}
-                            <button class="btn btn-sm btn-outline-primary geocode-btn" 
-                                    data-country="{{ location.country }}"
-                                    data-id="{{ location.id }}">
-                                <i class="fas fa-map-marker-alt"></i> Géocoder
-                            </button>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <div class="alert alert-success">Tous les pays sont géocodés!</div>
-                {% endif %}
+            
+            <div class="form-group">
+                <label for="photo">Photo de la position</label>
+                <input type="file" id="photo" name="photo" accept="image/*" capture="environment" class="form-control-file">
+                <small class="form-text text-muted">Prenez une photo directement ou sélectionnez-en une</small>
             </div>
-        </div>
+            
+            <div id="photo-preview">
+                <h5>Aperçu de la photo</h5>
+                <img id="preview-img" src="#" alt="Aperçu de la photo">
+            </div>
+            
+            <button type="button" id="save-btn" class="btn btn-primary mt-3" disabled>
+                <span class="spinner-border spinner-border-sm spinner" role="status" aria-hidden="true"></span>
+                <span class="text"><i class="fas fa-save"></i> Enregistrer ma position</span>
+            </button>
+        </form>
     </div>
-
-    <div class="col-md-6">
-        <!-- Carte avec outils de dessin -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">Carte Interactive</h4>
-                <small class="text-muted">Dessinez des zones avec <i class="fas fa-draw-polygon"></i></small>
-            </div>
-            <div class="card-footer text-right">
-                <button id="locate-me" class="btn btn-sm btn-info mr-2">
-                    <i class="fas fa-location-arrow"></i> Ma position
-                </button>
-                <button id="save-position" class="btn btn-sm btn-success" disabled>
-                    <i class="fas fa-save"></i> Enregistrer
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="search-container" class="input-group">
-                    <input type="text" id="country-search" class="form-control" placeholder="Rechercher un pays...">
-                    <div class="input-group-append">
-                        <span class="search-loading" id="search-loading">
-                            <i class="fas fa-spinner fa-spin"></i>
-                        </span>
-                        <button class="btn btn-primary" id="search-btn">
-                            <i class="fas fa-search"></i> Chercher
-                        </button>
-                    </div>
-                </div>
-                <div id="map-container">
-                    <div id="map"></div>
-                </div>
-                <div class="card-footer text-right polygon-actions">
-                    <button id="clear-polygons" class="btn btn-sm btn-danger mr-2">
-                        <i class="fas fa-trash"></i> Effacer tout
-                    </button>
-                    <button id="save-polygons" class="btn btn-sm btn-success">
-                        <i class="fas fa-save"></i> Sauvegarder
-                    </button>
-                </div>
-            </div>
-        </div>
+    
+    <div id="saved-positions" class="mt-4">
+        <h4>Positions enregistrées</h4>
+        <div id="positions-list" class="list-group"></div>
     </div>
 </div>
-
-<button id="exit-fullscreen" class="btn btn-danger">
-    <i class="fas fa-times"></i> Quitter le zoom
-</button>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-
 <script>
-    $(document).ready(function() {
-        // Initialisation de la carte
-        var map = L.map('map').setView([20, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+$(document).ready(function() {
+    // Initialisation de la carte
+    const map = L.map('map').setView([34, 9], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    
+    let userMarker = null;
+    let clickedPosition = null;
+    
+    // Gestion du clic sur la carte
+    map.on('click', function(e) {
+        clickedPosition = e.latlng;
+        
+        // Mettre à jour les champs
+        $('#latitude').val(clickedPosition.lat.toFixed(6));
+        $('#longitude').val(clickedPosition.lng.toFixed(6));
+        
+        // Activer le bouton d'enregistrement
+        $('#save-btn').prop('disabled', false);
+        
+        // Supprimer l'ancien marqueur s'il existe
+        if (userMarker) {
+            map.removeLayer(userMarker);
+        }
+        
+        // Ajouter un nouveau marqueur
+        userMarker = L.marker(clickedPosition, {
+            icon: L.divIcon({
+                className: 'user-marker',
+                iconSize: [30, 30]
+            })
         }).addTo(map);
-
-        // Groupe pour les polygones dessinés
-        const drawnItems = new L.FeatureGroup();
-        map.addLayer(drawnItems);
-
-        // Configuration du dessin de polygone avec points
-        const drawControl = new L.Control.Draw({
-            position: 'topright',
-            draw: {
-                polygon: {
-                    shapeOptions: {
-                        color: '#3388ff',
-                        fillColor: '#3388ff',
-                        fillOpacity: 0.2,
-                        weight: 2,
-                        dashArray: '5, 5'
-                    },
-                    allowIntersection: false,
-                    showArea: true,
-                    guidelineDistance: 20,
-                    drawError: {
-                        color: '#b00b00',
-                        timeout: 1000
-                    }
-                },
-                rectangle: false,
-                circle: false,
-                marker: false,
-                polyline: false,
-                circlemarker: false
-            },
-            edit: {
-                featureGroup: drawnItems,
-                edit: false
-            }
-        });
-        map.addControl(drawControl);
-
-        // Fonction pour ajouter des points aux sommets du polygone
-        function addPolygonPoints(layer) {
-            const latlngs = layer.getLatLngs()[0];
-            
-            latlngs.forEach(latlng => {
-                L.circleMarker(latlng, {
-                    radius: 4,
-                    fillColor: "#3388ff",
-                    color: "#fff",
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 1,
-                    draggable: true
-                }).addTo(drawnItems).on('drag', function(e) {
-                    const marker = e.target;
-                    const index = latlngs.findIndex(ll => 
-                        ll.lat === marker.getLatLng().lat && 
-                        ll.lng === marker.getLatLng().lng
-                    );
-                    if (index !== -1) {
-                        latlngs[index] = marker.getLatLng();
-                        layer.setLatLngs([latlngs]);
-                    }
-                });
-            });
-        }
-
-        // Gestion de la création de polygone
-        map.on(L.Draw.Event.CREATED, function(e) {
-            const layer = e.layer;
-            drawnItems.addLayer(layer);
-            addPolygonPoints(layer);
-            
-            layer.bindPopup(`
-                <div class="text-center">
-                    <h5>Zone Sélectionnée</h5>
-                    <div class="zone-actions">
-                        <button class="btn btn-primary btn-sm zoom-to-polygon">
-                            <i class="fas fa-search-plus"></i> Zoomer
-                        </button>
-                        <button class="btn btn-danger btn-sm remove-polygon">
-                            <i class="fas fa-trash"></i> Supprimer
-                        </button>
-                    </div>
-                </div>
-            `);
-            
-            layer.on('popupopen', function() {
-                $('.zoom-to-polygon').click(function() {
-                    $('#map').addClass('fullscreen');
-                    $('#exit-fullscreen').show();
-                    map.fitBounds(layer.getBounds(), {padding: [20, 20]});
-                });
-                $('.remove-polygon').click(function() {
-                    map.removeLayer(layer);
-                });
-            });
-        });
-
-        // Sortie du mode plein écran
-        $('#exit-fullscreen').click(function() {
-            $('#map').removeClass('fullscreen');
-            $(this).hide();
-        });
-
-        // Fonction pour créer un polygone hexagone
-        function createHexagon(lat, lng, size) {
-            var points = [];
-            for (var i = 0; i < 6; i++) {
-                var angle = 2 * Math.PI / 6 * i;
-                points.push([
-                    lat + size * Math.cos(angle),
-                    lng + size * Math.sin(angle)
-                ]);
-            }
-            return points;
-        }
-
-        // Ajout des marqueurs ET des polygones
-        {% for location in locations %}
-            {% if location.latitude and location.longitude %}
-                var marker = L.marker([{{ location.latitude }}, {{ location.longitude }}], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div class="marker-pin" style="background-color: {% if location.population > 100000000 %}#ff0000{% elif location.population > 50000000 %}#ff8000{% else %}#008000{% endif %};"></div>`,
-                        iconSize: [30, 42],
-                        iconAnchor: [15, 42]
-                    })
-                }).addTo(map)
-                .bindPopup(`
-                    <div class="text-center">
-                        <h5><b>{{ location.country }}</b></h5>
-                        <hr>
-                        {% if location.image %}
-                            <img src="{{ location.image.url }}" alt="{{ location.country }}" style="max-width: 200px; max-height: 150px; margin-bottom: 10px;">
-                        {% endif %}
-                        <p>Population: <b>{{ location.population|default:"N/A" }}</b></p>
-                        <p>Latitude: <code>{{ location.latitude|floatformat:4 }}</code></p>
-                        <p>Longitude: <code>{{ location.longitude|floatformat:4 }}</code></p>
-                    </div>
-                `);
-            {% endif %}
-        {% endfor %}
-
-    // Bouton Effacer tout - Doit vider drawnItems
-    $('#clear-polygons').click(function () {
-        drawnItems.clearLayers();
     });
-
-    // Bouton Sauvegarder - Doit envoyer les données au serveur
-    $('#save-polygons').click(function () {
-        if (drawnItems.getLayers().length === 0) {
-            alert("Aucun polygone à sauvegarder!");
+    
+    // Prévisualisation de la photo
+    $('#photo').change(function() {
+        const file = this.files[0];
+        if (file) {
+            // Vérification de la taille (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert('danger', 'La photo ne doit pas dépasser 5MB');
+                $(this).val('');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#preview-img').attr('src', e.target.result);
+                $('#photo-preview').show();
+            }
+            reader.readAsDataURL(file);
+        } else {
+            $('#photo-preview').hide();
+        }
+    });
+    
+    // Enregistrement de la position
+    $('#save-btn').click(function() {
+        // Réinitialisation des erreurs
+        $('.error-message').empty();
+        $('.is-invalid').removeClass('is-invalid');
+        
+        // Validation
+        let isValid = true;
+        const firstName = $('#first-name').val().trim();
+        const lastName = $('#last-name').val().trim();
+        
+        if (!firstName) {
+            $('#first-name').addClass('is-invalid');
+            $('#first-name-error').text('Veuillez saisir votre prénom');
+            isValid = false;
+        }
+        
+        if (!lastName) {
+            $('#last-name').addClass('is-invalid');
+            $('#last-name-error').text('Veuillez saisir votre nom');
+            isValid = false;
+        }
+        
+        if (!clickedPosition) {
+            $('#latitude').addClass('is-invalid');
+            $('#longitude').addClass('is-invalid');
+            $('#latitude-error').text('Veuillez sélectionner une position sur la carte');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            showAlert('danger', 'Veuillez corriger les erreurs dans le formulaire');
             return;
         }
-
-        const polygons = [];
-        drawnItems.eachLayer(function (layer) {
-            if (layer instanceof L.Polygon) {
-                polygons.push({
-                    geo_json: layer.toGeoJSON(),
-                    bounds: layer.getBounds()
-                });
+        
+        // Création du FormData
+        const formData = new FormData();
+        formData.append('first_name', firstName);
+        formData.append('last_name', lastName);
+        formData.append('latitude', clickedPosition.lat);
+        formData.append('longitude', clickedPosition.lng);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        // Ajout de la photo si elle existe
+        const photoInput = $('#photo')[0];
+        if (photoInput.files.length > 0) {
+            formData.append('photo', photoInput.files[0]);
+        }
+        
+        // Désactive le bouton pendant l'envoi
+        const $btn = $(this);
+        $btn.prop('disabled', true).addClass('loading');
+        
+        // Envoi AJAX
+        $.ajax({
+            url: '/save-position/',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    addToSavedList(response);
+                    resetForm();
+                    showAlert('success', 'Position enregistrée avec succès!');
+                } else {
+                    showAlert('danger', response.message || "Erreur lors de l'enregistrement");
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = "Erreur serveur";
+                try {
+                    const res = JSON.parse(xhr.responseText);
+                    errorMsg = res.message || errorMsg;
+                } catch (e) {
+                    console.error('Erreur:', e);
+                }
+                showAlert('danger', errorMsg);
+            },
+            complete: function() {
+                $btn.prop('disabled', false).removeClass('loading');
             }
         });
-
-        if (polygons.length === 0) {
-            alert("Aucun polygone valide à sauvegarder!");
-            return;
+    });
+    
+    // Fonction pour ajouter à la liste des positions sauvegardées
+    function addToSavedList(data) {
+        const photoHtml = data.photo_url 
+            ? `<img src="${data.photo_url}" class="position-photo img-thumbnail mr-3" alt="Photo">`
+            : '';
+            
+        $('#positions-list').prepend(`
+            <div class="list-group-item">
+                <div class="d-flex align-items-center">
+                    ${photoHtml}
+                    <div class="flex-grow-1">
+                        <h5>${data.first_name} ${data.last_name}</h5>
+                        <small class="text-muted">
+                            Lat: ${parseFloat(data.latitude).toFixed(4)}, 
+                            Lng: ${parseFloat(data.longitude).toFixed(4)}
+                        </small>
+                    </div>
+                    <button class="btn btn-sm btn-info view-btn" 
+                            data-lat="${data.latitude}" 
+                            data-lng="${data.longitude}">
+                        <i class="fas fa-map-marker-alt"></i> Voir
+                    </button>
+                </div>
+            </div>
+        `);
+    }
+    
+    // Gestion du clic sur le bouton "Voir"
+    $(document).on('click', '.view-btn', function() {
+        const lat = $(this).data('lat');
+        const lng = $(this).data('lng');
+        map.setView([lat, lng], 15);
+    });
+    
+    // Fonction pour réinitialiser le formulaire
+    function resetForm() {
+        $('#position-form')[0].reset();
+        $('#photo-preview').hide();
+        if (userMarker) {
+            map.removeLayer(userMarker);
+            userMarker = null;
         }
+        clickedPosition = null;
+        $('#save-btn').prop('disabled', true);
+    }
+    
+    // Fonction pour afficher les alertes
+    function showAlert(type, message) {
+        const alert = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>`;
+        $('#alerts-container').html(alert);
+    }
+    
+    // Chargement initial des positions existantes
+    function loadSavedPositions() {
+        $.ajax({
+            url: '/api/saved-positions/',
+            type: 'GET',
+            success: function(data) {
+                data.forEach(position => {
+                    addToSavedList(position);
+                });
+            },
+            error: function() {
+                console.error("Erreur lors du chargement des positions existantes");
+            }
+        });
+    }
+    // Exemple avec Fetch API
+async function savePosition(positionData) {
+    const formData = new FormData();
+    formData.append('first_name', positionData.firstName);
+    formData.append('last_name', positionData.lastName);
+    formData.append('latitude', positionData.latitude);
+    formData.append('longitude', positionData.longitude);
+    
+    if (positionData.photo) {
+        formData.append('photo', positionData.photo);
+    }
 
-        // Afficher un indicateur de chargement
-        $(this).html('<i class="fas fa-spinner fa-spin"></i> Sauvegarde...');
-        $(this).prop('disabled', true);
+    try {
+        const response = await fetch('/save-position/', {
+            method: 'POST',
+            body: formData,
+            // Pas besoin de headers Content-Type avec FormData,
+            // le navigateur le fera automatiquement avec le boundary
+        });
 
-        fetch('/save-polygon/', {
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Erreur lors de la sauvegarde');
+        }
+        return data;
+    } catch (error) {
+        console.error('Erreur:', error);
+        throw error;
+    }
+}
+
+// OU en JSON
+async function savePositionJson(positionData) {
+    try {
+        const response = await fetch('/save-position/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
+                'X-CSRFToken': getCookie('csrftoken'), // Si vous utilisez CSRF
             },
-            body: JSON.stringify({ polygons: polygons })
-        })
-            .then(response => {
-                if (!response.ok) throw new Error('Erreur de réseau');
-                return response.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    alert('Polygones sauvegardés avec succès!');
-                } else {
-                    throw new Error(data.message || 'Erreur inconnue');
-                }
-            })
-            .catch(error => {
-                console.error('Erreur:', error);
-                alert("Erreur lors de la sauvegarde: " + error.message);
-            })
-            .finally(() => {
-                $('#save-polygons').html('<i class="fas fa-save"></i> Sauvegarder');
-                $('#save-polygons').prop('disabled', false);
-            });
-    });
-        // Fonction de recherche améliorée
-        $('#search-btn').click(function () {
-            const country = $('#country-search').val().trim();
-
-            // Supprimer les marqueurs précédents
-            if (window.searchMarker) map.removeLayer(window.searchMarker);
-            if (window.searchHighlight) map.removeLayer(window.searchHighlight);
-
-            if (!country) {
-                alert("Veuillez entrer un nom de pays");
-                return;
-            }
-
-            // Afficher l'indicateur de chargement
-            const searchBtn = $(this);
-            $('#search-loading').show();
-            searchBtn.prop('disabled', true);
-
-            // Utilisation de l'API Nominatim pour la recherche
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(country)}&limit=1&polygon_geojson=1`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.length > 0) {
-                        const result = data[0];
-                        const lat = parseFloat(result.lat);
-                        const lng = parseFloat(result.lon);
-                        
-                        // Centrer la carte sur le résultat
-                        map.setView([lat, lng], 6, {
-                            animate: true,
-                            duration: 1
-                        });
-
-                        // Ajouter un marqueur
-                        window.searchMarker = L.marker([lat, lng], {
-                            icon: L.divIcon({
-                                className: 'custom-marker',
-                                html: '<div class="marker-pin" style="background-color: #ff00ff;"></div>',
-                                iconSize: [30, 42],
-                                iconAnchor: [15, 42]
-                            })
-                        }).addTo(map)
-                        .bindPopup(`
-                            <div class="text-center">
-                                <h5><b>${result.display_name.split(',')[0]}</b></h5>
-                                <hr>
-                                <p>Latitude: <code>${lat.toFixed(4)}</code></p>
-                                <p>Longitude: <code>${lng.toFixed(4)}</code></p>
-                            </div>
-                        `)
-                        .openPopup();
-
-                        // Si des données polygonales sont disponibles
-                        if (result.geojson) {
-                            window.searchHighlight = L.geoJSON(result.geojson, {
-                                style: {
-                                    color: '#ff00ff',
-                                    weight: 2,
-                                    opacity: 1,
-                                    fillOpacity: 0.2
-                                }
-                            }).addTo(map);
-                            map.fitBounds(window.searchHighlight.getBounds());
-                        }
-                    } else {
-                        alert("Pays non trouvé. Vérifiez l'orthographe.");
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur de recherche:', error);
-                    alert("Erreur lors de la recherche. Veuillez réessayer.");
-                })
-                .finally(() => {
-                    $('#search-loading').hide();
-                    searchBtn.prop('disabled', false);
-                });
+            body: JSON.stringify({
+                first_name: positionData.firstName,
+                last_name: positionData.lastName,
+                latitude: positionData.latitude,
+                longitude: positionData.longitude,
+                // Note: Vous ne pouvez pas envoyer de fichier avec JSON
+            }),
         });
 
-        // Fonction de géocodage améliorée
-        function geocodeCountry(country, callback) {
-            if (!country.trim()) {
-                alert("Veuillez entrer un nom de pays valide");
-                return;
-            }
-
-            fetch(`/geocode/?country=${encodeURIComponent(country)}`)
-                .then(response => {
-                    if (!response.ok) throw new Error('Erreur réseau');
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.latitude && data.longitude) {
-                        callback(data.latitude, data.longitude, country);
-                    } else {
-                        alert("Pays non trouvé! Vérifiez l'orthographe.");
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur:', error);
-                    alert("Erreur lors du géocodage: " + error.message);
-                });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Erreur lors de la sauvegarde');
         }
-
-        // Géocodage des éléments en attente
-        $('.geocode-btn').click(function() {
-            var country = $(this).data('country');
-            var id = $(this).data('id');
-            var btn = $(this);
-            
-            btn.html('<i class="fas fa-spinner fa-spin"></i> Géocodage...');
-            btn.prop('disabled', true);
-
-            geocodeCountry(country, function(lat, lng) {
-                $.post(`/update-location/${id}/`, {
-                    latitude: lat,
-                    longitude: lng,
-                    csrfmiddlewaretoken: '{{ csrf_token }}'
-                }, function() {
-                    location.reload();
-                });
-            });
-        });
-
-        // Auto-complétion pour la recherche
-        var availableCountries = [
-            {% for location in locations %}
-                "{{ location.country }}",
-            {% endfor %}
-            {% for location in pending_locations %}
-                "{{ location.country }}",
-            {% endfor %}
-        ];
-        $("#country-search").autocomplete({
-            source: availableCountries
-        });
-
-        // Marqueur temporaire pour la sélection
-        let tempMarker = null;
-
-        // Gestion du clic sur la carte pour pré-remplir le formulaire
-        map.on('click', function(e) {
-            // Supprime le marqueur précédent s'il existe
-            if (tempMarker) {
-                map.removeLayer(tempMarker);
-            }
-            
-            // Ajoute un nouveau marqueur temporaire
-            tempMarker = L.marker(e.latlng, {
-                icon: L.divIcon({
-                    className: 'custom-marker',
-                    html: '<div class="marker-pin" style="background-color: #ff00ff;"></div>',
-                    iconSize: [30, 42],
-                    iconAnchor: [15, 42]
-                })
-            }).addTo(map)
-            .bindPopup('Position sélectionnée<br>Cliquez sur "Enregistrer" pour sauvegarder');
-            
-            // Pré-remplir le formulaire
-            document.getElementById('id_latitude').value = e.latlng.lat;
-            document.getElementById('id_longitude').value = e.latlng.lng;
-            
-            // Optionnel: centrer la carte sur le point cliqué
-            map.panTo(e.latlng);
-            
-            // Utilisez l'API Nominatim pour obtenir le nom du pays
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
-                .then(response => response.json())
-                .then(data => {
-                    const country = data.address.country || 'Inconnu';
-                    // Mettre à jour le champ country dans le formulaire si existe
-                    const countryField = document.getElementById('id_country');
-                    if (countryField) {
-                        countryField.value = country;
-                    }
-                });
-        });
-        let userPositionMarker = null;
-            let currentPosition = null;
-
-            // Bouton "Ma position"
-            document.getElementById('locate-me').addEventListener('click', function () {
-                if (navigator.geolocation) {
-                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Localisation...';
-
-                    navigator.geolocation.getCurrentPosition(
-                        function (position) {
-                            // Succès de la localisation
-                            const lat = position.coords.latitude;
-                            const lng = position.coords.longitude;
-                            currentPosition = { lat, lng };
-
-                            // Supprimer l'ancien marqueur s'il existe
-                            if (userPositionMarker) {
-                                map.removeLayer(userPositionMarker);
-                            }
-
-                            // Ajouter un nouveau marqueur
-                            userPositionMarker = L.marker([lat, lng], {
-                                icon: L.divIcon({
-                                    className: 'custom-marker',
-                                    html: '<div class="marker-pin" style="background-color: #3388ff;"></div>',
-                                    iconSize: [30, 42],
-                                    iconAnchor: [15, 42]
-                                })
-                            }).addTo(map)
-                                .bindPopup('Votre position actuelle').openPopup();
-
-                            // Centrer la carte sur la position
-                            map.setView([lat, lng], 15);
-
-                            // Activer le bouton d'enregistrement
-                            document.getElementById('save-position').disabled = false;
-                            document.getElementById('locate-me').innerHTML = '<i class="fas fa-location-arrow"></i> Ma position';
-                        },
-                        function (error) {
-                            // Erreur de localisation
-                            alert('Erreur de localisation : ' + error.message);
-                            document.getElementById('locate-me').innerHTML = '<i class="fas fa-location-arrow"></i> Ma position';
-                        }
-                    );
-                } else {
-                    alert('La géolocalisation n\'est pas supportée par votre navigateur');
-                }
-            });
-
-            // Bouton "Enregistrer"
-            document.getElementById('save-position').addEventListener('click', function () {
-                if (!currentPosition) return;
-
-                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi...';
-
-                // Envoyer la position au serveur
-                fetch('/save-position/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({
-                        latitude: currentPosition.lat,
-                        longitude: currentPosition.lng
-                    })
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Position enregistrée avec succès!');
-                        } else {
-                            throw new Error(data.message || 'Erreur inconnue');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Erreur:', error);
-                        alert('Erreur lors de l\'enregistrement: ' + error.message);
-                    })
-                    .finally(() => {
-                        this.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
-                    });
-            });
-        // Vérification pour les utilisateurs non connectés
-        document.addEventListener('DOMContentLoaded', function() {
-            {% if not user.is_authenticated %}
-            map.on('click', function() {
-                alert('Veuillez vous connecter pour sauvegarder des positions.');
-            });
-            {% endif %}
-        });
-    });
+        return data;
+    } catch (error) {
+        console.error('Erreur:', error);
+        throw error;
+    }
+}
+    
+    // Chargement initial
+    loadSavedPositions();
+});
 </script>
 {% endblock %}
